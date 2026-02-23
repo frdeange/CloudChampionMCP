@@ -13,7 +13,7 @@ on:
 
 env:
   RESOURCE_GROUP: RG-CloudChampion
-  LOCATION: westeurope
+  LOCATION: swedencentral
   ACR_NAME: acrcloudchampionmcp
   ACA_APP: mcp-cloudchampion
 

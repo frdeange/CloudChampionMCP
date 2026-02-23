@@ -1,0 +1,97 @@
+name: Deploy MCP to Azure Container Apps
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy_infra:
+        description: 'Deploy infrastructure (Bicep)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  RESOURCE_GROUP: rg-cloudchampion-mcp
+  LOCATION: westeurope
+  ACR_NAME: acrcloudchampionmcp
+  ACA_APP: mcp-cloudchampion
+
+jobs:
+  # ── Job 1: Infraestructura (solo si cambia infra/ o se lanza manualmente) ──
+  infra:
+    runs-on: ubuntu-latest
+    if: >
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_infra == 'true')
+      || (github.event_name == 'push' && contains(join(github.event.commits.*.modified, ','), 'infra/'))
+    outputs:
+      acr_login_server: ${{ steps.deploy.outputs.acrLoginServer }}
+      app_fqdn: ${{ steps.deploy.outputs.appFqdn }}
+      mcp_endpoint: ${{ steps.deploy.outputs.mcpEndpoint }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Create Resource Group
+        run: |
+          az group create \
+            --name ${{ env.RESOURCE_GROUP }} \
+            --location ${{ env.LOCATION }}
+
+      - name: Deploy Bicep
+        id: deploy
+        run: |
+          result=$(az deployment group create \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --template-file infra/main.bicep \
+            --parameters infra/main.parameters.json \
+            --query 'properties.outputs' \
+            -o json)
+
+          echo "acrLoginServer=$(echo $result | jq -r '.acrLoginServer.value')" >> "$GITHUB_OUTPUT"
+          echo "appFqdn=$(echo $result | jq -r '.appFqdn.value')" >> "$GITHUB_OUTPUT"
+          echo "mcpEndpoint=$(echo $result | jq -r '.mcpEndpoint.value')" >> "$GITHUB_OUTPUT"
+
+      - name: Show deployment outputs
+        run: |
+          echo "ACR: ${{ steps.deploy.outputs.acrLoginServer }}"
+          echo "App FQDN: ${{ steps.deploy.outputs.appFqdn }}"
+          echo "MCP Endpoint: ${{ steps.deploy.outputs.mcpEndpoint }}"
+
+  # ── Job 2: Build & Deploy de la aplicación ─────────────────────────────────
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    needs: [infra]
+    if: always() && !failure() && !cancelled()
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Build and push to ACR
+        run: |
+          az acr build \
+            --registry ${{ env.ACR_NAME }} \
+            --image mcp-cloudchampion:${{ github.sha }} \
+            --image mcp-cloudchampion:latest \
+            .
+
+      - name: Deploy to Container Apps
+        run: |
+          az containerapp update \
+            --name ${{ env.ACA_APP }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --image "${{ env.ACR_NAME }}.azurecr.io/mcp-cloudchampion:${{ github.sha }}"
+
+      - name: Show MCP endpoint
+        run: |
+          fqdn=$(az containerapp show \
+            --name ${{ env.ACA_APP }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query "properties.configuration.ingress.fqdn" -o tsv)
+          echo "MCP Server: https://${fqdn}/mcp"

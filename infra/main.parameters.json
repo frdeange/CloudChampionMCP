@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "acrName": {
+      "value": "acrcloudchampionmcp"
+    },
+    "environmentName": {
+      "value": "env-cloudchampion-mcp"
+    },
+    "appName": {
+      "value": "mcp-cloudchampion"
+    },
+    "minReplicas": {
+      "value": 0
+    },
+    "maxReplicas": {
+      "value": 3
+    },
+    "cpu": {
+      "value": "0.25"
+    },
+    "memory": {
+      "value": "0.5Gi"
+    },
+    "cacheTtlSeconds": {
+      "value": "600"
+    },
+    "logLevel": {
+      "value": "INFO"
+    }
+  }
+}

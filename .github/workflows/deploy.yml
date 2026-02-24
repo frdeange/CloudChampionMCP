@@ -77,10 +77,14 @@ jobs:
 
       - name: Deploy to Container Apps
         run: |
+          ACR_PASSWORD=$(az acr credential show --name ${{ env.ACR_NAME }} --query "passwords[0].value" -o tsv)
           az containerapp update \
             --name ${{ env.ACA_APP }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --image "${{ env.ACR_NAME }}.azurecr.io/mcp-cloudchampion:${{ github.sha }}"
+            --image "${{ env.ACR_NAME }}.azurecr.io/mcp-cloudchampion:${{ github.sha }}" \
+            --registry-server "${{ env.ACR_NAME }}.azurecr.io" \
+            --registry-username "${{ env.ACR_NAME }}" \
+            --registry-password "$ACR_PASSWORD"
 
       - name: Show MCP endpoint
         run: |

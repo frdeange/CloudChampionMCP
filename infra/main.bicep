@@ -107,19 +107,19 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
         transport: 'http'
         allowInsecure: false
       }
-      registries: hasImage ? [
+      registries: [
         {
           server: acr.properties.loginServer
           username: acr.listCredentials().username
           passwordSecretRef: 'acr-password'
         }
-      ] : []
-      secrets: hasImage ? [
+      ]
+      secrets: [
         {
           name: 'acr-password'
           value: acr.listCredentials().passwords[0].value
         }
-      ] : []
+      ]
     }
     template: {
       containers: [

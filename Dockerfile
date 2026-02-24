@@ -2,15 +2,15 @@
 FROM python:3.12-slim AS builder
 
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+COPY requirements.txt pyproject.toml ./
+COPY src/ ./src/
+RUN pip install --no-cache-dir --prefix=/install .
 
 # --- Runtime stage ---
 FROM python:3.12-slim
 
 WORKDIR /app
 COPY --from=builder /install /usr/local
-COPY src/ ./src/
 
 # Variables de entorno por defecto
 ENV MCP_TRANSPORT=streamable-http \
